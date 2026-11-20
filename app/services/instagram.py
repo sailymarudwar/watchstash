@@ -49,4 +49,5 @@ def fetch_caption(url: str) -> str:
     text = (data.get("title") or "").strip() or _html_to_text(data.get("html", ""))
     if not text:
         raise CaptionError("No caption in the response")
+    logger.info("Instagram oEmbed returned %d characters of caption text", len(text))
     return text[:MAX_CAPTION_CHARS]

@@ -28,6 +28,25 @@ def test_non_list_raises():
         _parse_titles('{"title": "Dark"}')
 
 
+def test_parses_list_surrounded_by_other_words():
+    raw = 'Here are the titles:\n["Dark", "Parasite"]\nLet me know if you need more.'
+    assert _parse_titles(raw) == ["Dark", "Parasite"]
+
+
+def test_parses_an_empty_list():
+    assert _parse_titles("[]") == []
+
+
+def test_reply_with_words_only_raises():
+    with pytest.raises(ExtractionError):
+        _parse_titles("I could not find any titles in that text.")
+
+
+def test_unfinished_list_raises():
+    with pytest.raises(ExtractionError):
+        _parse_titles('["Dark", ')
+
+
 def _fake_client(blocks, seen=None):
     class Messages:
         def create(self, **kwargs):

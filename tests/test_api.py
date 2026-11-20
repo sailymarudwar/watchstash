@@ -1,7 +1,7 @@
 import pytest
 
 from app.routes import stash as routes
-from app.services.extraction import ExtractionError
+from app.services.extraction import ExtractionError, TitleQuery
 from app.services.instagram import CaptionError
 
 ALICE = {"X-Access-Code": "code-alice"}
@@ -14,8 +14,12 @@ def fake_services(monkeypatch, make_entry):
         "Dark": make_entry("tv-1", "Dark"),
         "Parasite": make_entry("movie-2", "Parasite"),
     }
-    monkeypatch.setattr(routes, "extract_titles", lambda text: ["Dark", "Parasite", "Unknown"])
-    monkeypatch.setattr(routes, "lookup_title", lambda name: entries.get(name))
+    monkeypatch.setattr(
+        routes,
+        "extract_titles",
+        lambda text: [TitleQuery("Dark"), TitleQuery("Parasite", 2019), TitleQuery("Unknown")],
+    )
+    monkeypatch.setattr(routes, "lookup_title", lambda name, year=None: entries.get(name))
 
 
 def test_health(client):
@@ -97,10 +101,10 @@ def test_reel_link_caption_is_used_for_extraction(client, monkeypatch, make_entr
 
     def fake_extract(text):
         seen["text"] = text
-        return ["Dark"]
+        return [TitleQuery("Dark")]
 
     monkeypatch.setattr(routes, "extract_titles", fake_extract)
-    monkeypatch.setattr(routes, "lookup_title", lambda name: make_entry("tv-1", "Dark"))
+    monkeypatch.setattr(routes, "lookup_title", lambda name, year=None: make_entry("tv-1", "Dark"))
     r = client.post(
         "/api/extract",
         json={"text": "https://www.instagram.com/reel/abc123/"},
@@ -123,3 +127,17 @@ def test_unexpected_error_returns_500_and_logs_a_scrubbed_line(client, monkeypat
     assert "Extract crashed: RuntimeError" in caplog.text
     assert "SECRET123" not in caplog.text
     assert "api_key=***" in caplog.text
+
+
+def test_year_from_the_text_is_passed_to_the_catalog_lookup(client, monkeypatch, make_entry):
+    seen = []
+    monkeypatch.setattr(routes, "extract_titles", lambda text: [TitleQuery("Oldboy", 2003)])
+
+    def fake_lookup(name, year=None):
+        seen.append((name, year))
+        return make_entry("movie-9", "Oldboy")
+
+    monkeypatch.setattr(routes, "lookup_title", fake_lookup)
+    r = client.post("/api/extract", json={"text": "Oldboy (2003)"}, headers=ALICE)
+    assert r.json()["added"] == 1
+    assert seen == [("Oldboy", 2003)]

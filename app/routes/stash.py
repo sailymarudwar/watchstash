@@ -93,7 +93,9 @@ def _extract_and_save(text: str, user: str, session: Session) -> StashOut:
         )
 
     with ThreadPoolExecutor(max_workers=5) as pool:
-        looked_up = pool.map(lookup_title, titles[:MAX_TITLES])
+        looked_up = pool.map(
+            lambda q: lookup_title(q.title, q.year), titles[:MAX_TITLES]
+        )
         entries = [e for e in looked_up if e is not None]
 
     added = repo.add_entries(session, user, entries)

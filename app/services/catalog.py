@@ -50,18 +50,35 @@ def _fetch_imdb_rating(imdb_id: str | None) -> str | None:
     rating = (data or {}).get("imdbRating")
     return None if rating in (None, "N/A") else rating
 
-def _pick_best(matches: list[dict], title: str) -> dict:
+
+def _result_year(result: dict) -> str:
+    return (result.get("release_date") or result.get("first_air_date") or "")[:4]
+
+
+def _filter_by_year(matches: list[dict], year: int | None) -> list[dict]:
+    """Keep results released within a year of `year`; keep all if none are."""
+    if year is None:
+        return matches
+    near = [
+        r for r in matches
+        if _result_year(r).isdigit() and abs(int(_result_year(r)) - year) <= 1
+    ]
+    return near or matches
+
+
+def _pick_best(matches: list[dict], title: str, year: int | None = None) -> dict:
     wanted = title.strip().lower()
 
     def name(result: dict) -> str:
         return (result.get("title") or result.get("name") or "").strip().lower()
 
-    exact = [r for r in matches if name(r) == wanted]
-    pool = exact or matches
+    candidates = _filter_by_year(matches, year)
+    exact = [r for r in candidates if name(r) == wanted]
+    pool = exact or candidates
     return max(pool, key=lambda r: r.get("popularity", 0))
 
 
-def lookup_title(title: str) -> CatalogEntry | None:
+def lookup_title(title: str, year: int | None = None) -> CatalogEntry | None:
     settings = get_settings()
 
     search = _get_json(
@@ -78,7 +95,7 @@ def lookup_title(title: str) -> CatalogEntry | None:
         logger.info("No catalog match for %r", title)
         return None
 
-    best = _pick_best(matches, title)
+    best = _pick_best(matches, title, year)
     kind = best["media_type"]
     details = _get_json(
         f"{TMDB_URL}/{kind}/{best['id']}",

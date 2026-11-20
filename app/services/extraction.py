@@ -46,15 +46,32 @@ def _parse_titles(raw: str) -> list[str]:
     return list(dict.fromkeys(titles))  # remove duplicates, keep order
 
 
+def _response_text(response) -> str:
+    """Join the text blocks of a reply.
+
+    A reply can start with thinking blocks, so the first block is not always text.
+    """
+    text = "".join(
+        block.text for block in response.content if getattr(block, "type", None) == "text"
+    )
+    if not text.strip():
+        raise ExtractionError("Model returned no text")
+    return text
+
+
 def extract_titles(text: str) -> list[str]:
     settings = get_settings()
     try:
         response = _client().messages.create(
             model=settings.claude_model,
-            max_tokens=1000,
+            max_tokens=2000,
+            # Title extraction is simple, so skip thinking for speed and cost.
+            # "disabled" works on Haiku 5.5. If claude_model is changed to Sonnet 5.5,
+            # use {"type": "between_tools"} instead, because "disabled" is rejected there.
+            thinking={"type": "disabled"},
             messages=[{"role": "user", "content": PROMPT.format(text=text)}],
         )
     except APIError as exc:
         logger.error("Claude API call failed: %s", type(exc).__name__)
         raise ExtractionError("Claude API call failed") from exc
-    return _parse_titles(response.content[0].text)
+    return _parse_titles(_response_text(response))

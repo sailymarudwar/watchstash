@@ -18,7 +18,7 @@ from app.services.instagram import CaptionError, fetch_caption, find_reel_url
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
-MAX_TITLES = 15  # per request, to cap lookups and cost
+MAX_TITLES = 25  # per request, to cap lookups and cost
 
 # Patterns scrubbed from error messages before they are logged.
 _SECRET_PATTERNS = (

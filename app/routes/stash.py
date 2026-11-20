@@ -1,4 +1,6 @@
 import logging
+import re
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +19,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 MAX_TITLES = 15  # per request, to cap lookups and cost
+
+# Patterns scrubbed from error messages before they are logged.
+_SECRET_PATTERNS = (
+    (re.compile(r"(api_?key=)[^&\s'\"]+", re.IGNORECASE), r"\1***"),
+    (re.compile(r"postgres(?:ql)?(?:\+\w+)?://\S+", re.IGNORECASE), "postgres://***"),
+    (re.compile(r"sk-[A-Za-z0-9_-]{10,}"), "sk-***"),
+)
+
+
+def _describe_crash(exc: Exception) -> str:
+    """One log line for an unexpected error: its type, the innermost line of
+    our own code it passed through, and a shortened message with secrets removed."""
+    message = str(exc)[:300]
+    for pattern, replacement in _SECRET_PATTERNS:
+        message = pattern.sub(replacement, message)
+
+    where = "unknown"
+    for frame in traceback.extract_tb(exc.__traceback__):
+        path = frame.filename.replace("\\", "/")
+        if "/app/" in path:
+            where = f"app/{path.split('/app/')[-1]}:{frame.lineno} in {frame.name}"
+    return f"{type(exc).__name__} at {where}: {message}"
 
 
 def _to_out(item: StashItem) -> TitleOut:
@@ -48,13 +72,7 @@ def get_stash(
     return _stash_out(session, user)
 
 
-@router.post("/extract", response_model=StashOut)
-def extract(
-    body: ExtractRequest,
-    user: str = Depends(current_user),
-    session: Session = Depends(get_session),
-):
-    text = body.text
+def _extract_and_save(text: str, user: str, session: Session) -> StashOut:
     notice = None
 
     reel_url = find_reel_url(text)
@@ -82,6 +100,24 @@ def extract(
     if not entries and notice is None:
         notice = "No titles found in that text."
     return _stash_out(session, user, added, notice)
+
+
+@router.post("/extract", response_model=StashOut)
+def extract(
+    body: ExtractRequest,
+    user: str = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    try:
+        return _extract_and_save(body.text, user, session)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        session.rollback()
+        logger.error("Extract crashed: %s", _describe_crash(exc))
+        raise HTTPException(
+            status_code=500, detail="Something went wrong on our side. Please try again."
+        )
 
 
 @router.put("/stash/{key}/watched")

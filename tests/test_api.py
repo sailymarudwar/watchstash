@@ -108,3 +108,18 @@ def test_reel_link_caption_is_used_for_extraction(client, monkeypatch, make_entr
     )
     assert r.json()["added"] == 1
     assert "Top picks: Dark" in seen["text"]
+
+
+def test_unexpected_error_returns_500_and_logs_a_scrubbed_line(client, monkeypatch, caplog):
+    def boom(text):
+        raise RuntimeError("failed calling https://x.test/?api_key=SECRET123&q=1")
+
+    monkeypatch.setattr(routes, "extract_titles", boom)
+    with caplog.at_level("ERROR"):
+        r = client.post("/api/extract", json={"text": "hello"}, headers=ALICE)
+
+    assert r.status_code == 500
+    assert "SECRET123" not in r.text
+    assert "Extract crashed: RuntimeError" in caplog.text
+    assert "SECRET123" not in caplog.text
+    assert "api_key=***" in caplog.text

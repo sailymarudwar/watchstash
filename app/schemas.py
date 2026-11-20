@@ -23,3 +23,4 @@ class TitleOut(BaseModel):
 class StashOut(BaseModel):
     results: list[TitleOut]
     added: int = 0
+    notice: str | None = None

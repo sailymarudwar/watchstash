@@ -2,6 +2,7 @@ import pytest
 
 from app.routes import stash as routes
 from app.services.extraction import ExtractionError
+from app.services.instagram import CaptionError
 
 ALICE = {"X-Access-Code": "code-alice"}
 BOB = {"X-Access-Code": "code-bob"}
@@ -74,3 +75,36 @@ def test_extraction_failure_returns_502(client, monkeypatch):
 def test_rejects_oversized_text(client):
     r = client.post("/api/extract", json={"text": "a" * 5001}, headers=ALICE)
     assert r.status_code == 422
+
+def test_reel_link_without_readable_caption_returns_notice(client, monkeypatch):
+    def fail(url):
+        raise CaptionError("nope")
+
+    monkeypatch.setattr(routes, "fetch_caption", fail)
+    r = client.post(
+        "/api/extract",
+        json={"text": "https://www.instagram.com/reel/abc123/"},
+        headers=ALICE,
+    )
+    assert r.status_code == 200
+    assert r.json()["added"] == 0
+    assert "caption" in r.json()["notice"]
+
+
+def test_reel_link_caption_is_used_for_extraction(client, monkeypatch, make_entry):
+    seen = {}
+    monkeypatch.setattr(routes, "fetch_caption", lambda url: "Top picks: Dark")
+
+    def fake_extract(text):
+        seen["text"] = text
+        return ["Dark"]
+
+    monkeypatch.setattr(routes, "extract_titles", fake_extract)
+    monkeypatch.setattr(routes, "lookup_title", lambda name: make_entry("tv-1", "Dark"))
+    r = client.post(
+        "/api/extract",
+        json={"text": "https://www.instagram.com/reel/abc123/"},
+        headers=ALICE,
+    )
+    assert r.json()["added"] == 1
+    assert "Top picks: Dark" in seen["text"]

@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WatchStash</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0a1224">
+<link rel="icon" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -135,6 +139,14 @@ let items = [];
 let filter = "all";
 let code = "";
 try { code = localStorage.getItem("ws_code") || ""; } catch (e) {}
+let pendingShare = "";
+(function readShare() {
+  if (location.pathname !== "/share") return;
+  const p = new URLSearchParams(location.search);
+  const parts = ["title", "text", "url"].map(k => p.get(k)).filter(Boolean);
+  pendingShare = Array.from(new Set(parts)).join("\n");
+  history.replaceState(null, "", "/");
+})();
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c =>
@@ -189,6 +201,11 @@ async function loadStash() {
     items = data.results;
     showApp();
     render();
+    if (pendingShare) {
+      $("text").value = pendingShare;
+      pendingShare = "";
+      findTitles();
+    }
   } catch (e) {
     if (e.message !== "unauthorized") showLogin("Couldn’t reach the server. Please try again.");
   }
@@ -205,7 +222,7 @@ async function findTitles() {
   try {
     const data = await api("/api/extract", { method: "POST", body: JSON.stringify({ text }) });
     items = data.results;
-    status.textContent = data.added ? `Added ${data.added} new title(s).` : "No new titles found.";
+    status.textContent = data.notice || (data.added ? `Added ${data.added} new title(s).` : "No new titles found.");
     render();
   } catch (e) {
     if (e.message !== "unauthorized") {
@@ -291,6 +308,9 @@ function render() {
 $("code").addEventListener("keydown", e => { if (e.key === "Enter") enter(); });
 
 if (code) { loadStash(); } else { showLogin(""); }
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
 </script>
 </body>
 </html>

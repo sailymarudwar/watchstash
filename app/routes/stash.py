@@ -11,6 +11,7 @@ from app.repositories import stash as repo
 from app.schemas import ExtractRequest, StashOut, TitleOut, WatchedRequest
 from app.services.catalog import lookup_title
 from app.services.extraction import ExtractionError, extract_titles
+from app.services.instagram import CaptionError, fetch_caption, find_reel_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -32,9 +33,11 @@ def _to_out(item: StashItem) -> TitleOut:
     )
 
 
-def _stash_out(session: Session, user: str, added: int = 0) -> StashOut:
+def _stash_out(
+    session: Session, user: str, added: int = 0, notice: str | None = None
+) -> StashOut:
     items = repo.list_items(session, user)
-    return StashOut(results=[_to_out(i) for i in items], added=added)
+    return StashOut(results=[_to_out(i) for i in items], added=added, notice=notice)
 
 
 @router.get("/stash", response_model=StashOut)
@@ -51,8 +54,20 @@ def extract(
     user: str = Depends(current_user),
     session: Session = Depends(get_session),
 ):
+    text = body.text
+    notice = None
+
+    reel_url = find_reel_url(text)
+    if reel_url:
+        try:
+            text = f"{text}\n\n{fetch_caption(reel_url)}"
+        except CaptionError:
+            notice = "Couldn’t read that reel’s caption. Paste the caption text instead."
+            if not text.replace(reel_url, " ").strip():
+                return _stash_out(session, user, 0, notice)
+
     try:
-        titles = extract_titles(body.text)
+        titles = extract_titles(text)
     except ExtractionError:
         logger.exception("Title extraction failed")
         raise HTTPException(
@@ -64,7 +79,9 @@ def extract(
         entries = [e for e in looked_up if e is not None]
 
     added = repo.add_entries(session, user, entries)
-    return _stash_out(session, user, added)
+    if not entries and notice is None:
+        notice = "No titles found in that text."
+    return _stash_out(session, user, added, notice)
 
 
 @router.put("/stash/{key}/watched")

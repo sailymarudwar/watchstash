@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WatchStash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #0a1224;
+    --bg: #101c36;
+    --surface: #182a4c;
+    --edge: #2c426e;
+    --gold: #d8a548;
+    --gold-soft: #f0cf8a;
+    --ivory: #f3efe6;
+    --muted: #9fb0cc;
+    --emerald: #2f8a68;
+    --rose: #d8788b;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    font-family: "DM Sans", system-ui, sans-serif;
+    color: var(--ivory);
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 220px, var(--bg-deep) 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 28px 18px 60px; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  h1 {
+    font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 38px;
+    margin: 0 0 4px; color: var(--gold-soft); letter-spacing: 0.3px;
+  }
+  .tagline { margin: 0 0 22px; color: var(--muted); }
+  .link { border: 0; background: transparent; color: var(--muted); font-size: 14px; padding: 8px 4px; }
+  .link:hover { color: var(--ivory); }
+
+  textarea, input {
+    width: 100%; padding: 14px; border-radius: 14px; border: 1px solid var(--edge);
+    background: var(--bg-deep); color: var(--ivory); font: inherit; font-size: 15px;
+  }
+  textarea { height: 112px; resize: vertical; }
+  textarea::placeholder, input::placeholder { color: var(--muted); opacity: 0.8; }
+  textarea:focus, input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+  button { font: inherit; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+  button:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 2px; }
+  .primary {
+    width: 100%; margin-top: 10px; padding: 14px; border: 0; border-radius: 12px;
+    background: var(--gold); color: var(--bg-deep); font-weight: 600; font-size: 16px;
+  }
+  .primary:hover { background: var(--gold-soft); }
+  .primary:disabled { opacity: 0.6; cursor: wait; }
+  .msg { min-height: 22px; margin: 10px 2px 0; color: var(--gold-soft); font-size: 14px; }
+  .msg.error { color: var(--rose); }
+
+  #login { background: var(--surface); border: 1px solid var(--edge); border-radius: 16px; padding: 20px; }
+  #login p { margin: 0 0 14px; color: var(--ivory); }
+
+  .tabs {
+    display: flex; gap: 4px; margin: 18px 0 20px; padding: 4px;
+    background: var(--bg-deep); border: 1px solid var(--edge); border-radius: 999px;
+  }
+  .tab {
+    flex: 1; padding: 9px 6px; border: 0; border-radius: 999px;
+    background: transparent; color: var(--muted); font-weight: 500; font-size: 14px;
+  }
+  .tab:hover { color: var(--ivory); }
+  .tab.active { background: var(--gold); color: var(--bg-deep); font-weight: 600; }
+
+  .card { background: var(--surface); border: 1px solid var(--edge); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+  .card.watched { opacity: 0.6; }
+  .top { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+  .card h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 21px; line-height: 1.25; margin: 0; }
+  .year { color: var(--muted); font-weight: 400; font-size: 17px; margin-left: 6px; }
+  .kind { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .rating {
+    flex-shrink: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--gold);
+    color: var(--gold-soft); font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 17px;
+  }
+  .rating.none { border-color: var(--edge); color: var(--muted); font-family: inherit; font-weight: 400; font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+  .chip { padding: 4px 11px; border-radius: 999px; font-size: 13px; background: var(--bg); border: 1px solid var(--edge); color: var(--ivory); }
+  .where { margin: 14px 0 0; font-size: 14px; }
+  .where.none { color: var(--muted); }
+  .actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+  .toggle { padding: 9px 16px; border-radius: 10px; border: 1px solid var(--gold); background: transparent; color: var(--gold-soft); font-weight: 500; }
+  .toggle:hover { background: rgba(216, 165, 72, 0.15); }
+  .toggle.on { background: var(--emerald); border-color: var(--emerald); color: #fff; }
+  .remove { margin-left: auto; padding: 9px 10px; border: 0; background: transparent; color: var(--muted); font-size: 14px; border-radius: 8px; }
+  .remove:hover { color: var(--rose); }
+  .empty { text-align: center; color: var(--muted); padding: 36px 12px; line-height: 1.5; }
+
+  @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>WatchStash</h1>
+      <p class="tagline">Paste a reel’s caption and keep every title worth watching.</p>
+    </div>
+    <button id="signout" class="link" hidden onclick="signOut()">Sign out</button>
+  </header>
+
+  <section id="login" hidden>
+    <p>Enter your access code to open your stash.</p>
+    <input id="code" type="password" autocomplete="current-password" placeholder="Access code">
+    <button id="enter" class="primary" onclick="enter()">Open my stash</button>
+    <div id="loginMsg" class="msg"></div>
+  </section>
+
+  <section id="app" hidden>
+    <textarea id="text" placeholder="Paste a reel caption or a list of titles here…"></textarea>
+    <button id="go" class="primary" onclick="findTitles()">Find titles</button>
+    <div id="status" class="msg"></div>
+
+    <div class="tabs">
+      <button class="tab active" data-f="all" onclick="setFilter('all')">All</button>
+      <button class="tab" data-f="todo" onclick="setFilter('todo')">To watch</button>
+      <button class="tab" data-f="done" onclick="setFilter('done')">Watched</button>
+    </div>
+    <div id="list"></div>
+  </section>
+</div>
+
+<script>
+let items = [];
+let filter = "all";
+let code = "";
+try { code = localStorage.getItem("ws_code") || ""; } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: { "Content-Type": "application/json", "X-Access-Code": code }
+  });
+  if (res.status === 401) {
+    signOut("That access code didn’t work. Please try again.");
+    throw new Error("unauthorized");
+  }
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+function showLogin(msg) {
+  $("app").hidden = true;
+  $("signout").hidden = true;
+  $("login").hidden = false;
+  $("loginMsg").textContent = msg || "";
+  $("loginMsg").className = "msg" + (msg ? " error" : "");
+}
+
+function showApp() {
+  $("login").hidden = true;
+  $("app").hidden = false;
+  $("signout").hidden = false;
+}
+
+function signOut(msg) {
+  code = "";
+  items = [];
+  try { localStorage.removeItem("ws_code"); } catch (e) {}
+  $("code").value = "";
+  showLogin(typeof msg === "string" ? msg : "");
+}
+
+async function enter() {
+  const value = $("code").value.trim();
+  if (!value) return;
+  code = value;
+  try { localStorage.setItem("ws_code", code); } catch (e) {}
+  await loadStash();
+}
+
+async function loadStash() {
+  try {
+    const data = await api("/api/stash");
+    items = data.results;
+    showApp();
+    render();
+  } catch (e) {
+    if (e.message !== "unauthorized") showLogin("Couldn’t reach the server. Please try again.");
+  }
+}
+
+async function findTitles() {
+  const text = $("text").value.trim();
+  if (!text) return;
+  const status = $("status");
+  const btn = $("go");
+  btn.disabled = true;
+  status.className = "msg";
+  status.textContent = "Finding titles…";
+  try {
+    const data = await api("/api/extract", { method: "POST", body: JSON.stringify({ text }) });
+    items = data.results;
+    status.textContent = data.added ? `Added ${data.added} new title(s).` : "No new titles found.";
+    render();
+  } catch (e) {
+    if (e.message !== "unauthorized") {
+      status.className = "msg error";
+      status.textContent = "Couldn’t read titles from that text. Please try again.";
+    }
+  }
+  btn.disabled = false;
+}
+
+async function toggleWatched(key) {
+  const item = items.find(i => i.key === key);
+  item.watched = !item.watched;
+  render();
+  try {
+    await api(`/api/stash/${encodeURIComponent(key)}/watched`, {
+      method: "PUT", body: JSON.stringify({ watched: item.watched })
+    });
+  } catch (e) {
+    item.watched = !item.watched;
+    render();
+  }
+}
+
+async function removeItem(key) {
+  const item = items.find(i => i.key === key);
+  if (!confirm("Delete " + item.title + " from your stash? This also clears its watched mark.")) return;
+  try {
+    await api(`/api/stash/${encodeURIComponent(key)}`, { method: "DELETE" });
+    items = items.filter(i => i.key !== key);
+    render();
+  } catch (e) {}
+}
+
+function setFilter(f) { filter = f; render(); }
+
+function render() {
+  const todo = items.filter(i => !i.watched).length;
+  const counts = { all: items.length, todo: todo, done: items.length - todo };
+  const labels = { all: "All", todo: "To watch", done: "Watched" };
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.f === filter);
+    t.textContent = `${labels[t.dataset.f]} ${counts[t.dataset.f]}`;
+  });
+
+  const shown = items.filter(i =>
+    filter === "all" || (filter === "done" ? i.watched : !i.watched));
+
+  if (!shown.length) {
+    const msg = items.length === 0
+      ? "Your stash is empty. Paste a reel caption above and tap Find titles."
+      : filter === "done" ? "Nothing marked as watched yet." : "You’ve watched everything in your stash.";
+    $("list").innerHTML = `<div class="empty">${msg}</div>`;
+    return;
+  }
+
+  $("list").innerHTML = shown.map(i => `
+    <article class="card ${i.watched ? "watched" : ""}">
+      <div class="top">
+        <div>
+          <h3>${esc(i.title)}<span class="year">${esc(i.year)}</span></h3>
+          <p class="kind">${esc(i.type)}</p>
+        </div>
+        ${i.imdb_rating
+          ? `<div class="rating">★ ${esc(i.imdb_rating)}</div>`
+          : `<div class="rating none">Not rated</div>`}
+      </div>
+      <div class="chips">${i.genres.map(g => `<span class="chip">${esc(g)}</span>`).join("")}</div>
+      ${i.streaming.length
+        ? `<p class="where">Watch on ${esc(i.streaming.join(", "))}</p>`
+        : `<p class="where none">Not on subscription services in your region</p>`}
+      <div class="actions">
+        <button class="toggle ${i.watched && filter !== "done" ? "on" : ""}" onclick="toggleWatched('${esc(i.key)}')">
+          ${i.watched ? (filter === "done" ? "Move to To watch" : "Watched ✓") : "Mark as watched"}
+        </button>
+        ${filter === "done" ? "" : `<button class="remove" onclick="removeItem('${esc(i.key)}')">Delete from stash</button>`}
+        
+      </div>
+    </article>
+  `).join("");
+}
+
+$("code").addEventListener("keydown", e => { if (e.key === "Enter") enter(); });
+
+if (code) { loadStash(); } else { showLogin(""); }
+</script>
+</body>
+</html>

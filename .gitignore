@@ -1,0 +1,8 @@
+.env
+*.db
+__pycache__/
+.venv/
+watched.json
+stash.json
+_old/
+.pytest_cache/
